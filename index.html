@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
+    <title>Preview Ujian Guru</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           1. GAYA UMUM & LOGIN
+           ========================================= */
+        :root {
+            --primary-color: #4A90E2;
+            --bg-color: #F7F9FC;
+            --text-color: #333;
+            --card-bg: #FFFFFF;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .view-section { display: none; height: 100%; width: 100%; }
+        .view-section.active { display: flex; flex-direction: column; }
+
+        .admin-container {
+            width: 100%; max-width: 450px; margin: auto; padding: 20px;
+            box-sizing: border-box; display: flex; flex-direction: column;
+            justify-content: center; min-height: 100vh;
+        }
+
+        .card {
+            background: var(--card-bg); padding: 25px; border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center;
+        }
+
+        .card h2 { margin-top: 0; color: var(--primary-color); }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 0.9em; color: #666; }
+        
+        .form-control {
+            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 1em; box-sizing: border-box;
+        }
+        .form-control:focus { border-color: var(--primary-color); outline: none; }
+
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            background-color: var(--primary-color); color: white;
+            font-weight: bold; cursor: pointer; font-size: 1em; margin-top: 10px;
+            transition: 0.2s;
+        }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        .btn-secondary { background-color: #6c757d; margin-top: 10px; }
+
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color); border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .error-msg { color: #dc3545; font-size: 0.9em; margin-top: 10px; display: none; }
+
+        /* =========================================
+           2. GAYA PREVIEW UJIAN
+           ========================================= */
+        #preview-view { background-color: #e0e0e0; font-family: 'Inter', Arial, sans-serif; }
+        #preview-view.active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        #examBody {
+            display: flex; flex-direction: column; padding: 10px; gap: 10px;
+            flex-grow: 1; overflow-y: auto; padding-bottom: 60px;
+        }
+
+        /* Sidebar */
+        #examSidePanel {
+            order: 1; display: flex; flex-direction: column;
+            border: 1px solid #e0e0e0; border-radius: 8px;
+            background-color: #ffffff; overflow: hidden; flex-shrink: 0; margin-bottom: 10px;
+        }
+
+        .sidebar-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 15px; border-bottom: 1px solid #eee; background-color: #f8f9fa;
+        }
+        #timerText { font-family: 'Roboto Mono', monospace; font-size: 1.5em; font-weight: bold; color: var(--danger-color); }
+        
+        .sidebar-content-wrapper { max-height: 0; transition: max-height 0.3s ease; overflow: hidden; }
+        .sidebar-content-wrapper.expanded { max-height: 300px; overflow-y: auto; }
+        
+        #questionGridContainer {
+            padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(35px, 1fr)); gap: 5px;
+        }
+        
+        .question-nav-box {
+            aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+            border: 1px solid #ccc; border-radius: 4px; font-weight: bold; font-size: 0.85em; cursor: pointer;
+            position: relative; background: #fff;
+        }
+        
+        /* STATE NAVIGASI */
+        .question-nav-box.current { border-color: #007bff; background-color: #e2f0ff; box-shadow: 0 0 0 2px #007bff; z-index: 2;}
+        .question-nav-box.answered { background-color: var(--success-color); color: white; border-color: var(--success-color); }
+        .question-nav-box.ragu { background-color: var(--warning-color); color: #000; border-color: #e0a800; }
+        .question-nav-box.ragu::after {
+            content: ''; position: absolute; top: 0; right: 0;
+            border-top: 10px solid #fff; border-left: 10px solid transparent; opacity: 0.5;
+        }
+        
+        #toggleSidebarBtn { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 0.8em; color: #333; }
+
+        /* Area Soal */
+        #examMainContent { order: 2; flex-grow: 1; display: flex; flex-direction: column; }
+        #questionDisplayBox {
+            background: white; border-radius: 8px; padding: 15px;
+            border: 1px solid #e0e0e0; flex-grow: 1; display: flex; flex-direction: column;
+        }
+
+        #questionHeader {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 15px;
+        }
+        .q-badge { background-color: #0066cc; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 10px; }
+        
+        /* Checkbox Ragu-ragu */
+        .ragu-container { display: flex; align-items: center; gap: 5px; font-weight: 500; font-size: 0.9em; cursor: pointer; }
+        .ragu-container input { width: 16px; height: 16px; cursor: pointer; }
+
+        #questionContent { font-size: 1.05em; line-height: 1.6; margin-bottom: 20px; }
+        #questionContent img { max-width: 100%; height: auto; border-radius: 4px; display: block; margin: 10px 0; }
+
+        .option-label {
+            display: flex; align-items: flex-start; gap: 10px; padding: 10px;
+            border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px;
+            cursor: pointer; transition: background 0.2s, border-color 0.2s;
+        }
+        .option-label:hover { background-color: #f9f9f9; }
+        .option-label.selected { background-color: #e2f0ff; border-color: #007bff; }
+        .option-label input { margin-top: 5px; }
+        .option-text img { max-width: 100%; height: auto; vertical-align: middle; }
+
+        .exam-nav { display: flex; justify-content: space-between; margin-top: auto; padding-top: 15px; }
+        .nav-btn {
+            padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; color: white; cursor: pointer;
+        }
+        .btn-prev { background-color: #6c757d; }
+        .btn-next { background-color: #007bff; }
+        .btn-prev:disabled { opacity: 0.5; }
+
+        #previewFooter {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: #343a40; color: white; padding: 10px;
+            text-align: center; font-size: 0.9em; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;
+        }
+        .footer-badge { background: #ffc107; color: #000; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.8em; }
+
+        #exitPreviewBtn {
+            background-color: #dc3545; color: white; border: none; padding: 5px 12px;
+            border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8em;
+        }
+
+        @media (min-width: 768px) {
+            #examBody { flex-direction: row; padding: 20px; }
+            #examSidePanel { width: 250px; margin-bottom: 0; height: fit-content; }
+            .sidebar-content-wrapper { max-height: none !important; }
+            #toggleSidebarBtn { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOADING & LOGIN -->
+    <div id="loading-view" class="view-section active">
+        <div class="admin-container">
+            <div class="card">
+                <div class="spinner"></div>
+                <p id="loading-text">Menyiapkan Aplikasi...</p>
+                <p id="system-login-error" class="error-msg"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-view" class="view-section">
+        <div class="admin-container">
+            <div class="card">
+                <h2>LOGIN GURU</h2>
+                <p style="color:#666; font-size:0.9em;">Masuk untuk Preview Soal</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn" id="loginBtn">Masuk</button>
+                    <p id="login-error" class="error-msg"></p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- SELECTION -->
+    <div id="selection-view" class="view-section">
+        <div class="admin-container">
+            <div class="card">
+                <h2>PILIH UJIAN</h2>
+                <p style="color:#666; font-size:0.9em;">Pilih data soal yang ingin di-preview</p>
+                <div class="form-group">
+                    <label>Tahun Ajaran</label>
+                    <select id="select-ta" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label>Jenis Ujian</label>
+                    <select id="select-ujian" class="form-control" disabled></select>
+                </div>
+                <div class="form-group">
+                    <label>Kelas</label>
+                    <select id="select-kelas" class="form-control" disabled></select>
+                </div>
+                <div class="form-group">
+                    <label>Mata Pelajaran</label>
+                    <select id="select-mapel" class="form-control" disabled></select>
+                </div>
+                <button id="btn-start-preview" class="btn" disabled>PREVIEW SOAL</button>
+                <button id="btn-logout" class="btn btn-secondary">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PREVIEW EXAM -->
+    <div id="preview-view" class="view-section">
+        <div id="examBody">
+            <div id="examSidePanel">
+                <div class="sidebar-header">
+                    <span id="timerText">02:00:00</span>
+                    <button id="toggleSidebarBtn">Daftar Soal ▼</button>
+                </div>
+                <div id="sidebarContent" class="sidebar-content-wrapper">
+                    <div id="questionGridContainer"></div>
+                </div>
+            </div>
+
+            <div id="examMainContent">
+                <div id="questionDisplayBox">
+                    <div id="questionHeader">
+                        <div>Soal No. <span id="qNumberDisplay" class="q-badge">1</span></div>
+                        <label class="ragu-container">
+                            <input type="checkbox" id="raguCheckbox">
+                            Ragu-ragu
+                        </label>
+                    </div>
+                    
+                    <div id="questionContent"></div>
+                    <div id="answerOptions"></div>
+
+                    <div class="exam-nav">
+                        <button id="prevBtn" class="nav-btn btn-prev">Sebelumnya</button>
+                        <button id="nextBtn" class="nav-btn btn-next">Selanjutnya</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="previewFooter">
+            <div>
+                <span class="footer-badge">MODE PREVIEW</span>
+                <span id="guruNameFooter" style="margin-left:8px;">Guru</span>
+            </div>
+            <button id="exitPreviewBtn">KELUAR</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+        import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+
+        // FIREBASE CONFIG
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbXJ4VuACXyHJhl2eVSB2vHiT6hrx-XnE",
+            authDomain: "setup-73809.firebaseapp.com",
+            databaseURL: "https://setup-73809-default-rtdb.firebaseio.com",
+            projectId: "setup-73809",
+            storageBucket: "setup-73809.firebasestorage.app",
+            messagingSenderId: "843995999446",
+            appId: "1:843995999446:web:7fd92546f2d0bea73fed77"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        // STATE
+        let loggedInGuru = null;
+        let ujiansDataCache = null;
+        let aksesDataCache = null;
+        
+        let currentExamQuestions = [];
+        let currentQuestionIndex = 0;
+        let timerInterval;
+        
+        let previewAnswers = [];
+        let previewRagu = [];
+
+        // DOM ELEMENTS
+        const views = {
+            loading: document.getElementById('loading-view'),
+            login: document.getElementById('login-view'),
+            selection: document.getElementById('selection-view'),
+            preview: document.getElementById('preview-view')
+        };
+        const loadingText = document.getElementById('loading-text');
+        const systemLoginError = document.getElementById('system-login-error');
+        const raguCheckbox = document.getElementById('raguCheckbox');
+
+        // --- AUTH ---
+        async function performAutoLogin() {
+            try {
+                loadingText.textContent = "Mengubungkan ke Database...";
+                await signInWithEmailAndPassword(auth, "speropa@gmail.com", "Pajangan201184*");
+                return true;
+            } catch (error) {
+                console.error("System Login Failed:", error);
+                loadingText.textContent = "Gagal terhubung ke Database.";
+                systemLoginError.textContent = error.message;
+                systemLoginError.style.display = 'block';
+                return false;
+            }
+        }
+        
+        async function initApp() {
+            const isSystemLogged = await performAutoLogin();
+            if (!isSystemLogged) return;
+
+            const savedGuru = localStorage.getItem('guruPreviewSession');
+            if (savedGuru) {
+                loggedInGuru = JSON.parse(savedGuru);
+                loadDashboard();
+            } else {
+                showView('login');
+            }
+
+            // PERBAIKAN: EVENT LISTENER RAGU-RAGU (GLOBAL)
+            // Ini mencegah error "replaceChild" karena kita tidak pernah menghapus elemen ini
+            raguCheckbox.addEventListener('change', (e) => {
+                if(currentExamQuestions.length > 0) {
+                    previewRagu[currentQuestionIndex] = e.target.checked;
+                    renderGrid(); // Refresh warna grid
+                }
+            });
+
+            // PERBAIKAN: EVENT LISTENER KELUAR (GLOBAL)
+            document.getElementById('exitPreviewBtn').addEventListener('click', () => {
+                if(confirm("Keluar dari mode preview?")) {
+                    clearInterval(timerInterval);
+                    showView('selection');
+                }
+            });
+        }
+
+        function showView(viewName) {
+            Object.values(views).forEach(el => el.classList.remove('active'));
+            views[viewName].classList.add('active');
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const errorMsg = document.getElementById('login-error');
+
+            btn.textContent = 'Memverifikasi...'; btn.disabled = true; errorMsg.style.display = 'none';
+
+            try {
+                const snapshot = await get(ref(db, 'gurus'));
+                if (!snapshot.exists()) throw new Error("Data guru tidak ditemukan di server.");
+
+                let found = null;
+                snapshot.forEach(childSnap => {
+                    const guru = childSnap.val();
+                    if (guru.username === username && guru.password === password) {
+                        found = { id: childSnap.key, ...guru };
+                    }
+                });
+
+                if (found) {
+                    loggedInGuru = found;
+                    localStorage.setItem('guruPreviewSession', JSON.stringify(found));
+                    loadDashboard();
+                } else {
+                    throw new Error("Username atau Password salah.");
+                }
+            } catch (err) {
+                errorMsg.textContent = err.message; errorMsg.style.display = 'block';
+            } finally {
+                btn.textContent = 'Masuk'; btn.disabled = false;
+            }
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            localStorage.removeItem('guruPreviewSession');
+            loggedInGuru = null;
+            window.location.reload();
+        });
+
+        // --- DASHBOARD ---
+        async function loadDashboard() {
+            showView('loading');
+            loadingText.textContent = "Memuat Data Ujian...";
+            document.getElementById('guruNameFooter').textContent = loggedInGuru.nama;
+
+            try {
+                const [ujiansSnap, aksesSnap] = await Promise.all([
+                    get(ref(db, 'customUjians')),
+                    get(ref(db, `akses/${loggedInGuru.id}`))
+                ]);
+
+                ujiansDataCache = ujiansSnap.val() || {};
+                aksesDataCache = aksesSnap.val() || [];
+                populateDropdowns();
+                showView('selection');
+            } catch (err) {
+                alert("Gagal memuat data: " + err.message);
+                showView('login');
+            }
+        }
+
+        const taSelect = document.getElementById('select-ta');
+        const ujianSelect = document.getElementById('select-ujian');
+        const kelasSelect = document.getElementById('select-kelas');
+        const mapelSelect = document.getElementById('select-mapel');
+        const startBtn = document.getElementById('btn-start-preview');
+
+        function populateDropdowns() {
+            taSelect.innerHTML = '<option value="">-- Pilih Tahun Ajaran --</option>';
+            Object.keys(ujiansDataCache).sort().reverse().forEach(ta => {
+                const opt = document.createElement('option');
+                opt.value = ta; opt.textContent = ta;
+                taSelect.appendChild(opt);
+            });
+        }
+
+        taSelect.addEventListener('change', () => {
+            ujianSelect.innerHTML = '<option value="">-- Pilih Ujian --</option>';
+            ujianSelect.disabled = true; resetLowerDropdowns('ujian');
+            
+            const ta = taSelect.value;
+            if (ta && ujiansDataCache[ta]) {
+                Object.values(ujiansDataCache[ta]).forEach(ujian => {
+                    // PERBAIKAN: Hanya tampilkan jika ujian.active === true
+                    if (ujian.active === true) {
+                        const opt = document.createElement('option');
+                        opt.value = ujian.name; opt.textContent = ujian.name;
+                        ujianSelect.appendChild(opt);
+                    }
+                });
+                ujianSelect.disabled = false;
+            }
+        });
+
+        ujianSelect.addEventListener('change', () => {
+            kelasSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
+            kelasSelect.disabled = true; resetLowerDropdowns('kelas');
+
+            if (ujianSelect.value) {
+                const uniqueKelas = [...new Set(aksesDataCache.map(a => a.kelas))].sort();
+                uniqueKelas.forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k; opt.textContent = k;
+                    kelasSelect.appendChild(opt);
+                });
+                kelasSelect.disabled = false;
+            }
+        });
+
+        kelasSelect.addEventListener('change', () => {
+            mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>';
+            mapelSelect.disabled = true; startBtn.disabled = true;
+
+            if (kelasSelect.value) {
+                const mapels = aksesDataCache
+                    .filter(a => a.kelas === kelasSelect.value)
+                    .map(a => a.mapel)
+                    .sort();
+                
+                mapels.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m; opt.textContent = m;
+                    mapelSelect.appendChild(opt);
+                });
+                mapelSelect.disabled = false;
+            }
+        });
+
+        mapelSelect.addEventListener('change', () => {
+            startBtn.disabled = !mapelSelect.value;
+        });
+
+        function resetLowerDropdowns(level) {
+            if (level === 'ujian') {
+                kelasSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>'; kelasSelect.disabled = true;
+                mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>'; mapelSelect.disabled = true;
+            } else if (level === 'kelas') {
+                mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>'; mapelSelect.disabled = true;
+            }
+            startBtn.disabled = true;
+        }
+
+        // --- PREVIEW ---
+        startBtn.addEventListener('click', async () => {
+            const ta = taSelect.value;
+            const ujian = ujianSelect.value;
+            const kelas = kelasSelect.value;
+            const mapel = mapelSelect.value;
+            const safeTA = ta.replace(/[\.\#\$\[\]\/]/g, '-');
+            const safeUjian = ujian.replace(/\s+/g, '-');
+            const safeMapel = mapel.replace(/\s+/g, '-');
+            const dbPath = `ujian/${safeTA}/${safeUjian}/Kelas-${kelas}/${safeMapel}`;
+
+            loadingText.textContent = "Mengunduh Soal dari Server...";
+            showView('loading');
+            
+            try {
+                const snapshot = await get(ref(db, dbPath));
+                if (!snapshot.exists()) throw new Error("Data soal belum dibuat.");
+                const data = snapshot.val();
+                if (!data.soal) throw new Error("Soal kosong.");
+
+                currentExamQuestions = Object.keys(data.soal)
+                    .sort((a, b) => parseInt(a) - parseInt(b))
+                    .map(key => data.soal[key]);
+
+                startExamPreview();
+            } catch (err) {
+                alert(err.message);
+                showView('selection');
+            }
+        });
+
+        function startExamPreview() {
+            previewAnswers = new Array(currentExamQuestions.length).fill(null);
+            previewRagu = new Array(currentExamQuestions.length).fill(false);
+            
+            showView('preview');
+            currentQuestionIndex = 0;
+            startTimer(120); 
+
+            renderGrid();
+            displayQuestion(0);
+        }
+
+        function startTimer(minutes) {
+            clearInterval(timerInterval);
+            let seconds = minutes * 60;
+            const timerEl = document.getElementById('timerText');
+            timerInterval = setInterval(() => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                timerEl.textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                seconds--;
+                if (seconds < 0) clearInterval(timerInterval);
+            }, 1000);
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('questionGridContainer');
+            container.innerHTML = '';
+            
+            currentExamQuestions.forEach((q, index) => {
+                const box = document.createElement('div');
+                box.className = 'question-nav-box';
+                box.textContent = index + 1;
+                box.id = `nav-box-${index}`;
+                box.onclick = () => displayQuestion(index);
+                
+                // Set warna sesuai state
+                if (previewRagu[index]) {
+                    box.classList.add('ragu');
+                } else if (previewAnswers[index] !== null) {
+                    box.classList.add('answered');
+                }
+                if (index === currentQuestionIndex) {
+                    box.classList.add('current');
+                }
+
+                container.appendChild(box);
+            });
+        }
+
+        function displayQuestion(index) {
+            currentQuestionIndex = index;
+            const q = currentExamQuestions[index];
+
+            // Refresh Grid Visuals
+            renderGrid();
+
+            document.getElementById('qNumberDisplay').textContent = index + 1;
+            document.getElementById('questionContent').innerHTML = q.pertanyaan;
+
+            // Update Checkbox Ragu (Tanpa replaceChild, cukup set checked)
+            raguCheckbox.checked = previewRagu[index];
+
+            // Render Opsi
+            const opsis = ['A', 'B', 'C', 'D'];
+            const container = document.getElementById('answerOptions');
+            container.innerHTML = '';
+
+            opsis.forEach(opt => {
+                const content = q[`pilihan${opt}`];
+                if (content) {
+                    const label = document.createElement('label');
+                    label.className = 'option-label';
+                    if (previewAnswers[index] === opt) label.classList.add('selected');
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = 'preview_ans';
+                    radio.value = opt;
+                    if (previewAnswers[index] === opt) radio.checked = true;
+
+                    radio.onchange = () => {
+                        previewAnswers[index] = opt;
+                        container.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                        label.classList.add('selected');
+                        renderGrid(); // Update warna hijau di grid
+                    };
+
+                    const divText = document.createElement('div');
+                    divText.className = 'option-text';
+                    divText.innerHTML = content; // Removed <b>${opt}.</b>
+                    
+                    label.appendChild(radio);
+                    label.appendChild(divText);
+                    container.appendChild(label);
+                }
+            });
+
+            document.getElementById('prevBtn').disabled = (index === 0);
+            document.getElementById('nextBtn').textContent = (index === currentExamQuestions.length - 1) ? 'Selesai Preview' : 'Selanjutnya';
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentQuestionIndex > 0) displayQuestion(currentQuestionIndex - 1);
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (currentQuestionIndex < currentExamQuestions.length - 1) {
+                displayQuestion(currentQuestionIndex + 1);
+            } else {
+                if(confirm("Selesai preview? Kembali ke menu awal.")) {
+                    clearInterval(timerInterval);
+                    showView('selection');
+                }
+            }
+        });
+
+        document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
+            document.getElementById('sidebarContent').classList.toggle('expanded');
+        });
+
+        window.addEventListener('load', initApp);
+    </script>
+</body>
+</html>
