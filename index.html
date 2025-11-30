@@ -432,10 +432,15 @@
         
         async function initApp() {
             checkDevice();
+            
+            // CLEANUP: Hapus sesi localStorage lama yang tidak aman
+            localStorage.removeItem('guruPreviewSession');
+
             const isSystemLogged = await performAutoLogin();
             if (!isSystemLogged) return;
 
-            const savedGuru = localStorage.getItem('guruPreviewSession');
+            // USE SESSION STORAGE (Aman: Hilang saat tutup browser)
+            const savedGuru = sessionStorage.getItem('guruPreviewSession');
             if (savedGuru) {
                 loggedInGuru = JSON.parse(savedGuru);
                 loadDashboard();
@@ -453,7 +458,6 @@
             document.getElementById('exitPreviewBtn').addEventListener('click', () => {
                 if(confirm("Keluar dari mode preview?")) {
                     clearInterval(timerInterval);
-                    // Hentikan listener update agar tidak memory leak
                     if (updateListenerUnsubscribe) {
                         updateListenerUnsubscribe();
                         updateListenerUnsubscribe = null;
@@ -467,7 +471,6 @@
                 warningModal.style.display = 'none';
             });
             
-            // Event Listener Tombol Update
             updateSoalBtn.addEventListener('click', handleUpdateSoal);
         }
 
@@ -499,7 +502,8 @@
 
                 if (found) {
                     loggedInGuru = found;
-                    localStorage.setItem('guruPreviewSession', JSON.stringify(found));
+                    // USE SESSION STORAGE
+                    sessionStorage.setItem('guruPreviewSession', JSON.stringify(found));
                     loadDashboard();
                 } else {
                     throw new Error("Username atau Password salah.");
@@ -512,7 +516,7 @@
         });
 
         document.getElementById('btn-logout').addEventListener('click', () => {
-            localStorage.removeItem('guruPreviewSession');
+            sessionStorage.removeItem('guruPreviewSession');
             loggedInGuru = null;
             window.location.reload();
         });
