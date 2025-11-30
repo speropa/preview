@@ -76,7 +76,27 @@
         .error-msg { color: #dc3545; font-size: 0.9em; margin-top: 10px; display: none; }
 
         /* =========================================
-           2. GAYA PREVIEW UJIAN
+           2. GAYA MODAL PERINGATAN
+           ========================================= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.6); z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+            padding: 20px; box-sizing: border-box;
+        }
+        .modal-content {
+            background-color: white; padding: 30px; border-radius: 12px;
+            max-width: 400px; width: 100%; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: fadeIn 0.3s;
+        }
+        .warning-icon { font-size: 3em; margin-bottom: 15px; }
+        .modal-title { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; color: var(--text-color); }
+        .modal-text { color: #555; margin-bottom: 25px; line-height: 1.5; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* =========================================
+           3. GAYA PREVIEW UJIAN
            ========================================= */
         #preview-view { background-color: #e0e0e0; font-family: 'Inter', Arial, sans-serif; }
         #preview-view.active { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
@@ -84,6 +104,35 @@
         #examBody {
             display: flex; flex-direction: column; padding: 10px; gap: 10px;
             flex-grow: 1; overflow-y: auto; padding-bottom: 60px;
+        }
+
+        /* TOMBOL UPDATE MELAYANG */
+        #updateSoalBtn {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 80px; right: 20px;
+            background-color: #ff9800; /* Orange Warning */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            cursor: pointer;
+            border: 2px solid white;
+            animation: pulseBtn 2s infinite;
+            align-items: center;
+            gap: 8px;
+            width: auto;
+            font-size: 0.9em;
+        }
+        #updateSoalBtn:hover { background-color: #f57c00; transform: scale(1.05); }
+        #updateSoalBtn svg { width: 20px; height: 20px; }
+
+        @keyframes pulseBtn {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
         }
 
         /* Sidebar */
@@ -184,6 +233,18 @@
 </head>
 <body>
 
+    <!-- MODAL PERINGATAN DESKTOP -->
+    <div id="desktop-warning-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="warning-icon">⚠️</div>
+            <div class="modal-title">Peringatan Perangkat</div>
+            <div class="modal-text">
+                Aplikasi ini dibuka melalui Komputer/Laptop. Tolong buka dengan perangkat Handphone saja untuk memastikan bahwa preview soal akan sesuai dengan perangkat siswa yang digunakan!
+            </div>
+            <button id="close-warning-btn" class="btn">Oke Mengerti</button>
+        </div>
+    </div>
+
     <!-- LOADING & LOGIN -->
     <div id="loading-view" class="view-section active">
         <div class="admin-container">
@@ -246,6 +307,14 @@
 
     <!-- PREVIEW EXAM -->
     <div id="preview-view" class="view-section">
+        <!-- UPDATE BUTTON FLOATING -->
+        <button id="updateSoalBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            UPDATE SOAL
+        </button>
+
         <div id="examBody">
             <div id="examSidePanel">
                 <div class="sidebar-header">
@@ -280,7 +349,7 @@
 
         <div id="previewFooter">
             <div>
-                <span class="footer-badge">MODE PREVIEW</span>
+                <span class="footer-badge">MODE PREVIEW (v2)</span>
                 <span id="guruNameFooter" style="margin-left:8px;">Guru</span>
             </div>
             <button id="exitPreviewBtn">KELUAR</button>
@@ -290,7 +359,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-        import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+        import { getDatabase, ref, get, child, onValue, off } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
 
         // FIREBASE CONFIG
         const firebaseConfig = {
@@ -319,6 +388,11 @@
         let previewAnswers = [];
         let previewRagu = [];
 
+        // Update Listener State
+        let updateListenerUnsubscribe = null;
+        let localTerakhirUpdate = "";
+        let currentDbPath = "";
+
         // DOM ELEMENTS
         const views = {
             loading: document.getElementById('loading-view'),
@@ -329,6 +403,17 @@
         const loadingText = document.getElementById('loading-text');
         const systemLoginError = document.getElementById('system-login-error');
         const raguCheckbox = document.getElementById('raguCheckbox');
+        const warningModal = document.getElementById('desktop-warning-modal');
+        const updateSoalBtn = document.getElementById('updateSoalBtn');
+
+        // --- DEVICE CHECK ---
+        function checkDevice() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isSmallScreen = window.innerWidth <= 900; 
+            if (!isMobile && !isSmallScreen) {
+                warningModal.style.display = 'flex';
+            }
+        }
 
         // --- AUTH ---
         async function performAutoLogin() {
@@ -346,6 +431,7 @@
         }
         
         async function initApp() {
+            checkDevice();
             const isSystemLogged = await performAutoLogin();
             if (!isSystemLogged) return;
 
@@ -357,22 +443,32 @@
                 showView('login');
             }
 
-            // PERBAIKAN: EVENT LISTENER RAGU-RAGU (GLOBAL)
-            // Ini mencegah error "replaceChild" karena kita tidak pernah menghapus elemen ini
             raguCheckbox.addEventListener('change', (e) => {
                 if(currentExamQuestions.length > 0) {
                     previewRagu[currentQuestionIndex] = e.target.checked;
-                    renderGrid(); // Refresh warna grid
+                    renderGrid(); 
                 }
             });
 
-            // PERBAIKAN: EVENT LISTENER KELUAR (GLOBAL)
             document.getElementById('exitPreviewBtn').addEventListener('click', () => {
                 if(confirm("Keluar dari mode preview?")) {
                     clearInterval(timerInterval);
+                    // Hentikan listener update agar tidak memory leak
+                    if (updateListenerUnsubscribe) {
+                        updateListenerUnsubscribe();
+                        updateListenerUnsubscribe = null;
+                    }
+                    updateSoalBtn.style.display = 'none';
                     showView('selection');
                 }
             });
+
+            document.getElementById('close-warning-btn').addEventListener('click', () => {
+                warningModal.style.display = 'none';
+            });
+            
+            // Event Listener Tombol Update
+            updateSoalBtn.addEventListener('click', handleUpdateSoal);
         }
 
         function showView(viewName) {
@@ -465,7 +561,6 @@
             const ta = taSelect.value;
             if (ta && ujiansDataCache[ta]) {
                 Object.values(ujiansDataCache[ta]).forEach(ujian => {
-                    // PERBAIKAN: Hanya tampilkan jika ujian.active === true
                     if (ujian.active === true) {
                         const opt = document.createElement('option');
                         opt.value = ujian.name; opt.textContent = ujian.name;
@@ -533,27 +628,96 @@
             const safeTA = ta.replace(/[\.\#\$\[\]\/]/g, '-');
             const safeUjian = ujian.replace(/\s+/g, '-');
             const safeMapel = mapel.replace(/\s+/g, '-');
-            const dbPath = `ujian/${safeTA}/${safeUjian}/Kelas-${kelas}/${safeMapel}`;
+            currentDbPath = `ujian/${safeTA}/${safeUjian}/Kelas-${kelas}/${safeMapel}`;
 
             loadingText.textContent = "Mengunduh Soal dari Server...";
             showView('loading');
             
             try {
-                const snapshot = await get(ref(db, dbPath));
+                const snapshot = await get(ref(db, currentDbPath));
                 if (!snapshot.exists()) throw new Error("Data soal belum dibuat.");
                 const data = snapshot.val();
                 if (!data.soal) throw new Error("Soal kosong.");
+
+                // Simpan timestamp awal
+                localTerakhirUpdate = data.terakhirUpdate || "";
 
                 currentExamQuestions = Object.keys(data.soal)
                     .sort((a, b) => parseInt(a) - parseInt(b))
                     .map(key => data.soal[key]);
 
                 startExamPreview();
+                
+                // Mulai listener untuk update
+                startUpdateListener(currentDbPath);
+
             } catch (err) {
                 alert(err.message);
                 showView('selection');
             }
         });
+
+        // --- UPDATE LOGIC ---
+        function startUpdateListener(path) {
+            if (updateListenerUnsubscribe) {
+                updateListenerUnsubscribe(); // Bersihkan listener lama jika ada
+            }
+
+            const updateRef = child(ref(db, path), 'terakhirUpdate');
+            
+            // onValue mengembalikan fungsi unsubscribe
+            updateListenerUnsubscribe = onValue(updateRef, (snapshot) => {
+                const serverUpdate = snapshot.val();
+                // Jika ada update baru dari server yang beda dengan lokal
+                if (serverUpdate && localTerakhirUpdate && serverUpdate !== localTerakhirUpdate) {
+                    updateSoalBtn.style.display = 'flex';
+                }
+            });
+        }
+
+        async function handleUpdateSoal() {
+            updateSoalBtn.style.display = 'none'; // Sembunyikan tombol
+            
+            // Tampilkan loading overlay sederhana atau ubah kursor
+            document.body.style.cursor = 'wait';
+            const prevText = updateSoalBtn.innerHTML;
+            updateSoalBtn.innerHTML = 'Memuat...';
+
+            try {
+                // Fetch ulang data
+                const snapshot = await get(ref(db, currentDbPath));
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    
+                    // Update lokal timestamp
+                    localTerakhirUpdate = data.terakhirUpdate;
+                    
+                    // Update array soal
+                    currentExamQuestions = Object.keys(data.soal)
+                        .sort((a, b) => parseInt(a) - parseInt(b))
+                        .map(key => data.soal[key]);
+                    
+                    // Re-render
+                    displayQuestion(currentQuestionIndex);
+                    renderGrid();
+                    
+                    // Reset array jawaban jika jumlah soal berubah (opsional, untuk safety)
+                    if (previewAnswers.length !== currentExamQuestions.length) {
+                        previewAnswers = new Array(currentExamQuestions.length).fill(null);
+                        previewRagu = new Array(currentExamQuestions.length).fill(false);
+                        currentQuestionIndex = 0; // Balik ke no 1
+                        displayQuestion(0);
+                    }
+                }
+            } catch (err) {
+                console.error("Gagal update:", err);
+                alert("Gagal memperbarui soal. Cek koneksi internet.");
+                updateSoalBtn.style.display = 'flex'; // Munculkan lagi jika gagal
+            } finally {
+                document.body.style.cursor = 'default';
+                updateSoalBtn.innerHTML = prevText;
+            }
+        }
 
         function startExamPreview() {
             previewAnswers = new Array(currentExamQuestions.length).fill(null);
@@ -591,7 +755,6 @@
                 box.id = `nav-box-${index}`;
                 box.onclick = () => displayQuestion(index);
                 
-                // Set warna sesuai state
                 if (previewRagu[index]) {
                     box.classList.add('ragu');
                 } else if (previewAnswers[index] !== null) {
@@ -606,19 +769,19 @@
         }
 
         function displayQuestion(index) {
+            // Pastikan index valid (terutama setelah update soal)
+            if (index >= currentExamQuestions.length) index = 0;
+            
             currentQuestionIndex = index;
             const q = currentExamQuestions[index];
 
-            // Refresh Grid Visuals
             renderGrid();
 
             document.getElementById('qNumberDisplay').textContent = index + 1;
             document.getElementById('questionContent').innerHTML = q.pertanyaan;
 
-            // Update Checkbox Ragu (Tanpa replaceChild, cukup set checked)
             raguCheckbox.checked = previewRagu[index];
 
-            // Render Opsi
             const opsis = ['A', 'B', 'C', 'D'];
             const container = document.getElementById('answerOptions');
             container.innerHTML = '';
@@ -640,12 +803,18 @@
                         previewAnswers[index] = opt;
                         container.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
                         label.classList.add('selected');
-                        renderGrid(); // Update warna hijau di grid
+                        renderGrid(); 
                     };
 
                     const divText = document.createElement('div');
                     divText.className = 'option-text';
-                    divText.innerHTML = content; // Removed <b>${opt}.</b>
+                    
+                    // --- PEMBERSIH KONTEN OTOMATIS ---
+                    let finalContent = content;
+                    const regexClean = new RegExp(`^(\\s*(?:<[^>]+>\\s*)*)${opt}[\\.\\)]\\s+`, 'i');
+                    finalContent = finalContent.replace(regexClean, '$1'); 
+
+                    divText.innerHTML = finalContent;
                     
                     label.appendChild(radio);
                     label.appendChild(divText);
@@ -667,6 +836,11 @@
             } else {
                 if(confirm("Selesai preview? Kembali ke menu awal.")) {
                     clearInterval(timerInterval);
+                    if (updateListenerUnsubscribe) {
+                        updateListenerUnsubscribe();
+                        updateListenerUnsubscribe = null;
+                    }
+                    updateSoalBtn.style.display = 'none';
                     showView('selection');
                 }
             }
