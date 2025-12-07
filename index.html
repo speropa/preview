@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=0.7, maximum-scale=2.0, user-scalable=yes">
-    <title>Preview Ujian Guru</title>
+    <title>Preview Ujian Guru (Multi-Server)</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -250,7 +250,7 @@
         <div class="admin-container">
             <div class="card">
                 <div class="spinner"></div>
-                <p id="loading-text">Menyiapkan Aplikasi...</p>
+                <p id="loading-text">Menyiapkan Aplikasi (Multi-Server)...</p>
                 <p id="system-login-error" class="error-msg"></p>
             </div>
         </div>
@@ -349,7 +349,7 @@
 
         <div id="previewFooter">
             <div>
-                <span class="footer-badge">MODE PREVIEW (v2)</span>
+                <span class="footer-badge">MODE PREVIEW (Multi-DB)</span>
                 <span id="guruNameFooter" style="margin-left:8px;">Guru</span>
             </div>
             <button id="exitPreviewBtn">KELUAR</button>
@@ -361,20 +361,54 @@
         import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
         import { getDatabase, ref, get, child, onValue, off } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
 
-        // FIREBASE CONFIG
-        const firebaseConfig = {
-            apiKey: "AIzaSyBAKwT7JY_HGnvK6h3u30-dfgRPXfef8l8",
-            authDomain: "abc-a13ea.firebaseapp.com",
-            databaseURL: "https://abc-a13ea-default-rtdb.firebaseio.com",
-            projectId: "abc-a13ea",
-            storageBucket: "abc-a13ea.firebasestorage.app",
-            messagingSenderId: "1052966795599",
-            appId: "1:1052966795599:web:d4d331199ca9081321ed3a"
-        };
+        // --- KONFIGURASI MULTI-FIREBASE ---
+        // 1. FIREBASE ATURAN
+        const configAturan = { apiKey: "AIzaSyAoH-kHpL15GHnFa41ZdG7dWFUsUZ4QJKc", authDomain: "aturan-694fe.firebaseapp.com", databaseURL: "https://aturan-694fe-default-rtdb.asia-southeast1.firebasedatabase.app", projectId: "aturan-694fe", storageBucket: "aturan-694fe.firebasestorage.app", messagingSenderId: "1008762962672", appId: "1:1008762962672:web:57815d4f3c49f211ebf835" };
+        // 2. FIREBASE 7
+        const config7 = { apiKey: "AIzaSyBkhBZw3oADXUAJ9FXY9-g7XBsSmQhzZVk", authDomain: "def-ab5ee.firebaseapp.com", databaseURL: "https://def-ab5ee-default-rtdb.firebaseio.com", projectId: "def-ab5ee", storageBucket: "def-ab5ee.firebasestorage.app", messagingSenderId: "129712840107", appId: "1:129712840107:web:ab10576fed95f735dd46ee" };
+        // 3. FIREBASE 8
+        const config8 = { apiKey: "AIzaSyAwilwwwEJ2MAdSf09BotxNH-z6RiXaHXY", authDomain: "abc-43e73.firebaseapp.com", databaseURL: "https://abc-43e73-default-rtdb.firebaseio.com", projectId: "abc-43e73", storageBucket: "abc-43e73.firebasestorage.app", messagingSenderId: "1043754727577", appId: "1:1043754727577:web:56c3732bf2a6ac900c2008" };
+        // 4. FIREBASE 9
+        const config9 = { apiKey: "AIzaSyBZ6JR3ggnUiZFQ-wdrewbfhzMUwFaGGzQ", authDomain: "abc-d272a.firebaseapp.com", databaseURL: "https://abc-d272a-default-rtdb.firebaseio.com", projectId: "abc-d272a", storageBucket: "abc-d272a.firebasestorage.app", messagingSenderId: "1036605132828", appId: "1:1036605132828:web:2b59f91290d50afe304fd9" };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getDatabase(app);
+        const appAturan = initializeApp(configAturan, "appAturan");
+        const app7 = initializeApp(config7, "app7");
+        const app8 = initializeApp(config8, "app8");
+        const app9 = initializeApp(config9, "app9");
+
+        const authAturan = getAuth(appAturan);
+        const dbAturan = getDatabase(appAturan);
+
+        const auth7 = getAuth(app7);
+        const db7 = getDatabase(app7);
+
+        const auth8 = getAuth(app8);
+        const db8 = getDatabase(app8);
+
+        const auth9 = getAuth(app9);
+        const db9 = getDatabase(app9);
+
+        // Kredensial Hardcoded
+        const SYS_EMAIL = "speropa@gmail.com";
+        const SYS_PASS = "Pajangan201184*";
+
+        // --- HELPER DB & AUTH ---
+        function getDbForGrade(gradeInput) {
+            const gradeStr = String(gradeInput).trim().toUpperCase();
+            if (gradeStr.startsWith('7')) return db7;
+            if (gradeStr.startsWith('8')) return db8;
+            if (gradeStr.startsWith('9')) return db9;
+            return dbAturan;
+        }
+
+        // Helper baru untuk mengambil Auth Instance berdasarkan kelas
+        function getAuthForGrade(gradeInput) {
+            const gradeStr = String(gradeInput).trim().toUpperCase();
+            if (gradeStr.startsWith('7')) return auth7;
+            if (gradeStr.startsWith('8')) return auth8;
+            if (gradeStr.startsWith('9')) return auth9;
+            return authAturan;
+        }
 
         // STATE
         let loggedInGuru = null;
@@ -388,9 +422,9 @@
         let previewAnswers = [];
         let previewRagu = [];
 
-        // Update Listener State
         let updateListenerUnsubscribe = null;
         let localTerakhirUpdate = "";
+        let currentDbInstance = null;
         let currentDbPath = "";
 
         // DOM ELEMENTS
@@ -406,7 +440,6 @@
         const warningModal = document.getElementById('desktop-warning-modal');
         const updateSoalBtn = document.getElementById('updateSoalBtn');
 
-        // --- DEVICE CHECK ---
         function checkDevice() {
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const isSmallScreen = window.innerWidth <= 900; 
@@ -415,31 +448,50 @@
             }
         }
 
-        // --- AUTH ---
-        async function performAutoLogin() {
+        // --- EFISIENSI 1: HANYA LOGIN SERVER ATURAN DI AWAL ---
+        async function performAutoLoginAturan() {
             try {
-                loadingText.textContent = "Mengubungkan ke Database...";
-                await signInWithEmailAndPassword(auth, "speropa@gmail.com", "Pajangan201184*");
+                loadingText.textContent = "Menghubungkan ke Server Aturan...";
+                // HANYA login ke Auth Aturan
+                if (!authAturan.currentUser) {
+                    await signInWithEmailAndPassword(authAturan, SYS_EMAIL, SYS_PASS);
+                }
                 return true;
             } catch (error) {
-                console.error("System Login Failed:", error);
-                loadingText.textContent = "Gagal terhubung ke Database.";
+                console.error("System Login Aturan Failed:", error);
+                loadingText.textContent = "Gagal terhubung ke Database Aturan.";
                 systemLoginError.textContent = error.message;
                 systemLoginError.style.display = 'block';
+                return false;
+            }
+        }
+
+        // --- EFISIENSI 2: FUNGSI LOGIN ON-DEMAND (LAZY LOAD) ---
+        async function ensureGradeAuth(grade) {
+            const targetAuth = getAuthForGrade(grade);
+            
+            // Jika sudah login, skip
+            if (targetAuth.currentUser) return true;
+
+            try {
+                loadingText.textContent = `Menghubungkan ke Server Kelas ${grade}...`;
+                await signInWithEmailAndPassword(targetAuth, SYS_EMAIL, SYS_PASS);
+                return true;
+            } catch (error) {
+                console.error(`Login Server Kelas ${grade} Gagal:`, error);
+                alert(`Gagal terhubung ke Server Kelas ${grade}. Cek koneksi.`);
                 return false;
             }
         }
         
         async function initApp() {
             checkDevice();
-            
-            // CLEANUP: Hapus sesi localStorage lama yang tidak aman
             localStorage.removeItem('guruPreviewSession');
 
-            const isSystemLogged = await performAutoLogin();
+            // HANYA login ke server UTAMA (Aturan)
+            const isSystemLogged = await performAutoLoginAturan();
             if (!isSystemLogged) return;
 
-            // USE SESSION STORAGE (Aman: Hilang saat tutup browser)
             const savedGuru = sessionStorage.getItem('guruPreviewSession');
             if (savedGuru) {
                 loggedInGuru = JSON.parse(savedGuru);
@@ -489,8 +541,8 @@
             btn.textContent = 'Memverifikasi...'; btn.disabled = true; errorMsg.style.display = 'none';
 
             try {
-                const snapshot = await get(ref(db, 'gurus'));
-                if (!snapshot.exists()) throw new Error("Data guru tidak ditemukan di server.");
+                const snapshot = await get(ref(dbAturan, 'gurus'));
+                if (!snapshot.exists()) throw new Error("Data guru tidak ditemukan di server Aturan.");
 
                 let found = null;
                 snapshot.forEach(childSnap => {
@@ -502,7 +554,6 @@
 
                 if (found) {
                     loggedInGuru = found;
-                    // USE SESSION STORAGE
                     sessionStorage.setItem('guruPreviewSession', JSON.stringify(found));
                     loadDashboard();
                 } else {
@@ -521,7 +572,6 @@
             window.location.reload();
         });
 
-        // --- DASHBOARD ---
         async function loadDashboard() {
             showView('loading');
             loadingText.textContent = "Memuat Data Ujian...";
@@ -529,8 +579,8 @@
 
             try {
                 const [ujiansSnap, aksesSnap] = await Promise.all([
-                    get(ref(db, 'customUjians')),
-                    get(ref(db, `akses/${loggedInGuru.id}`))
+                    get(ref(dbAturan, 'customUjians')),
+                    get(ref(dbAturan, `akses/${loggedInGuru.id}`))
                 ]);
 
                 ujiansDataCache = ujiansSnap.val() || {};
@@ -590,22 +640,75 @@
             }
         });
 
-        kelasSelect.addEventListener('change', () => {
-            mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>';
-            mapelSelect.disabled = true; startBtn.disabled = true;
+        // --- EFISIENSI 3: TRIGGER LOGIN KELAS HANYA SAAT TOMBOL DIKLIK ---
+        // FUNGSI BARU: Mengambil daftar mapel dari 'daftar_ujian' (Metadata Ringan)
+        // Dipanggil saat Kelas dipilih
+        kelasSelect.addEventListener('change', async () => {
+            const ta = taSelect.value;
+            const ujian = ujianSelect.value;
+            const kelas = kelasSelect.value;
 
-            if (kelasSelect.value) {
-                const mapels = aksesDataCache
-                    .filter(a => a.kelas === kelasSelect.value)
-                    .map(a => a.mapel)
-                    .sort();
+            // Reset Mapel & Tombol
+            mapelSelect.innerHTML = '<option value="">-- Memuat Mapel... --</option>';
+            mapelSelect.disabled = true;
+            startBtn.disabled = true;
+
+            if (!ta || !ujian || !kelas) {
+                mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>';
+                return;
+            }
+
+            // 1. Pastikan Auth ke Server Kelas Terkait (Lazy Auth)
+            const authReady = await ensureGradeAuth(kelas);
+            if (!authReady) {
+                mapelSelect.innerHTML = '<option value="">Gagal Koneksi Server</option>';
+                return;
+            }
+
+            // 2. Fetch Metadata Ringan dari 'daftar_ujian'
+            // Path: daftar_ujian/{TA}/{Ujian}/Kelas-{Kelas}
+            // Ini HANYA mengunduh daftar nama mapel, bukan soalnya. Sangat Hemat Bandwidth.
+            const safeTA = ta.replace(/[\.\#\$\[\]\/]/g, '-');
+            const safeUjian = ujian.replace(/\s+/g, '-');
+            const metaPath = `daftar_ujian/${safeTA}/${safeUjian}/Kelas-${kelas}`;
+            
+            const dbInstance = getDbForGrade(kelas);
+
+            try {
+                const snapshot = await get(ref(dbInstance, metaPath));
+                mapelSelect.innerHTML = '<option value="">-- Pilih Mapel --</option>';
                 
-                mapels.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m; opt.textContent = m;
-                    mapelSelect.appendChild(opt);
-                });
-                mapelSelect.disabled = false;
+                if (snapshot.exists()) {
+                    const availableMapels = Object.keys(snapshot.val()); // List Mapel yang ada ujiannya
+                    
+                    // Filter: Hanya tampilkan mapel yang diizinkan untuk guru ini (aksesDataCache)
+                    // DAN mapel tersebut benar-benar ada ujiannya di database (availableMapels)
+                    const filteredMapels = aksesDataCache
+                        .filter(a => a.kelas === kelas) // Filter kelas guru
+                        .map(a => a.mapel) // Ambil nama mapel guru
+                        .filter(m => {
+                            const safeMapelName = m.replace(/\s+/g, '-');
+                            return availableMapels.includes(safeMapelName); // Cek ketersediaan di DB
+                        })
+                        .sort();
+
+                    if (filteredMapels.length === 0) {
+                        mapelSelect.innerHTML = '<option value="">Tidak ada ujian tersedia</option>';
+                    } else {
+                        filteredMapels.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m;
+                            opt.textContent = m;
+                            mapelSelect.appendChild(opt);
+                        });
+                        mapelSelect.disabled = false;
+                    }
+                } else {
+                    mapelSelect.innerHTML = '<option value="">Belum ada data ujian</option>';
+                }
+            } catch (error) {
+                console.error("Gagal load mapel:", error);
+                mapelSelect.innerHTML = '<option value="">Error memuat data</option>';
             }
         });
 
@@ -623,37 +726,51 @@
             startBtn.disabled = true;
         }
 
-        // --- PREVIEW ---
         startBtn.addEventListener('click', async () => {
             const ta = taSelect.value;
             const ujian = ujianSelect.value;
             const kelas = kelasSelect.value;
             const mapel = mapelSelect.value;
+            
             const safeTA = ta.replace(/[\.\#\$\[\]\/]/g, '-');
             const safeUjian = ujian.replace(/\s+/g, '-');
             const safeMapel = mapel.replace(/\s+/g, '-');
+            
+            // PERBAIKAN: Mengembalikan path ke 'ujian/' sesuai request user
+            // daftar_ujian hanya untuk metadata dropdown
             currentDbPath = `ujian/${safeTA}/${safeUjian}/Kelas-${kelas}/${safeMapel}`;
-
-            loadingText.textContent = "Mengunduh Soal dari Server...";
+            
+            // Tampilkan loading sebelum proses koneksi DB
             showView('loading');
+
+            // --- KUNCI EFISIENSI: Login ke Server Kelas TERKAIT saja ---
+            const authReady = await ensureGradeAuth(kelas);
+            if (!authReady) {
+                showView('selection');
+                return;
+            }
+
+            currentDbInstance = getDbForGrade(kelas);
+            loadingText.textContent = `Mengunduh Soal dari Server ${kelas}...`;
             
             try {
-                const snapshot = await get(ref(db, currentDbPath));
-                if (!snapshot.exists()) throw new Error("Data soal belum dibuat.");
+                const snapshot = await get(ref(currentDbInstance, currentDbPath));
+                if (!snapshot.exists()) throw new Error("Data soal belum dibuat di server ini.");
                 const data = snapshot.val();
                 if (!data.soal) throw new Error("Soal kosong.");
 
-                // Simpan timestamp awal
                 localTerakhirUpdate = data.terakhirUpdate || "";
 
-                currentExamQuestions = Object.keys(data.soal)
-                    .sort((a, b) => parseInt(a) - parseInt(b))
-                    .map(key => data.soal[key]);
+                if (Array.isArray(data.soal)) {
+                    currentExamQuestions = data.soal.filter(item => item !== null && item !== undefined);
+                } else {
+                    currentExamQuestions = Object.keys(data.soal)
+                        .sort((a, b) => parseInt(a) - parseInt(b))
+                        .map(key => data.soal[key]);
+                }
 
                 startExamPreview();
-                
-                // Mulai listener untuk update
-                startUpdateListener(currentDbPath);
+                startUpdateListener(currentDbInstance, currentDbPath);
 
             } catch (err) {
                 alert(err.message);
@@ -661,18 +778,16 @@
             }
         });
 
-        // --- UPDATE LOGIC ---
-        function startUpdateListener(path) {
+        // ... (Sisa fungsi: startUpdateListener, handleUpdateSoal, startExamPreview, dll TETAP SAMA) ...
+        function startUpdateListener(dbInstance, path) {
             if (updateListenerUnsubscribe) {
-                updateListenerUnsubscribe(); // Bersihkan listener lama jika ada
+                updateListenerUnsubscribe(); 
             }
 
-            const updateRef = child(ref(db, path), 'terakhirUpdate');
+            const updateRef = child(ref(dbInstance, path), 'terakhirUpdate');
             
-            // onValue mengembalikan fungsi unsubscribe
             updateListenerUnsubscribe = onValue(updateRef, (snapshot) => {
                 const serverUpdate = snapshot.val();
-                // Jika ada update baru dari server yang beda dengan lokal
                 if (serverUpdate && localTerakhirUpdate && serverUpdate !== localTerakhirUpdate) {
                     updateSoalBtn.style.display = 'flex';
                 }
@@ -680,43 +795,39 @@
         }
 
         async function handleUpdateSoal() {
-            updateSoalBtn.style.display = 'none'; // Sembunyikan tombol
-            
-            // Tampilkan loading overlay sederhana atau ubah kursor
+            updateSoalBtn.style.display = 'none'; 
             document.body.style.cursor = 'wait';
             const prevText = updateSoalBtn.innerHTML;
             updateSoalBtn.innerHTML = 'Memuat...';
 
             try {
-                // Fetch ulang data
-                const snapshot = await get(ref(db, currentDbPath));
+                const snapshot = await get(ref(currentDbInstance, currentDbPath));
                 if (snapshot.exists()) {
                     const data = snapshot.val();
-                    
-                    // Update lokal timestamp
                     localTerakhirUpdate = data.terakhirUpdate;
                     
-                    // Update array soal
-                    currentExamQuestions = Object.keys(data.soal)
-                        .sort((a, b) => parseInt(a) - parseInt(b))
-                        .map(key => data.soal[key]);
+                    if (Array.isArray(data.soal)) {
+                         currentExamQuestions = data.soal.filter(item => item !== null && item !== undefined);
+                    } else {
+                        currentExamQuestions = Object.keys(data.soal)
+                            .sort((a, b) => parseInt(a) - parseInt(b))
+                            .map(key => data.soal[key]);
+                    }
                     
-                    // Re-render
                     displayQuestion(currentQuestionIndex);
                     renderGrid();
                     
-                    // Reset array jawaban jika jumlah soal berubah (opsional, untuk safety)
                     if (previewAnswers.length !== currentExamQuestions.length) {
                         previewAnswers = new Array(currentExamQuestions.length).fill(null);
                         previewRagu = new Array(currentExamQuestions.length).fill(false);
-                        currentQuestionIndex = 0; // Balik ke no 1
+                        currentQuestionIndex = 0;
                         displayQuestion(0);
                     }
                 }
             } catch (err) {
                 console.error("Gagal update:", err);
                 alert("Gagal memperbarui soal. Cek koneksi internet.");
-                updateSoalBtn.style.display = 'flex'; // Munculkan lagi jika gagal
+                updateSoalBtn.style.display = 'flex'; 
             } finally {
                 document.body.style.cursor = 'default';
                 updateSoalBtn.innerHTML = prevText;
@@ -726,11 +837,9 @@
         function startExamPreview() {
             previewAnswers = new Array(currentExamQuestions.length).fill(null);
             previewRagu = new Array(currentExamQuestions.length).fill(false);
-            
             showView('preview');
             currentQuestionIndex = 0;
             startTimer(120); 
-
             renderGrid();
             displayQuestion(0);
         }
@@ -751,81 +860,58 @@
         function renderGrid() {
             const container = document.getElementById('questionGridContainer');
             container.innerHTML = '';
-            
             currentExamQuestions.forEach((q, index) => {
                 const box = document.createElement('div');
                 box.className = 'question-nav-box';
                 box.textContent = index + 1;
                 box.id = `nav-box-${index}`;
                 box.onclick = () => displayQuestion(index);
-                
-                if (previewRagu[index]) {
-                    box.classList.add('ragu');
-                } else if (previewAnswers[index] !== null) {
-                    box.classList.add('answered');
-                }
-                if (index === currentQuestionIndex) {
-                    box.classList.add('current');
-                }
-
+                if (previewRagu[index]) box.classList.add('ragu');
+                else if (previewAnswers[index] !== null) box.classList.add('answered');
+                if (index === currentQuestionIndex) box.classList.add('current');
                 container.appendChild(box);
             });
         }
 
         function displayQuestion(index) {
-            // Pastikan index valid (terutama setelah update soal)
             if (index >= currentExamQuestions.length) index = 0;
-            
             currentQuestionIndex = index;
             const q = currentExamQuestions[index];
-
             renderGrid();
-
             document.getElementById('qNumberDisplay').textContent = index + 1;
             document.getElementById('questionContent').innerHTML = q.pertanyaan;
-
             raguCheckbox.checked = previewRagu[index];
-
             const opsis = ['A', 'B', 'C', 'D'];
             const container = document.getElementById('answerOptions');
             container.innerHTML = '';
-
             opsis.forEach(opt => {
                 const content = q[`pilihan${opt}`];
                 if (content) {
                     const label = document.createElement('label');
                     label.className = 'option-label';
                     if (previewAnswers[index] === opt) label.classList.add('selected');
-
                     const radio = document.createElement('input');
                     radio.type = 'radio';
                     radio.name = 'preview_ans';
                     radio.value = opt;
                     if (previewAnswers[index] === opt) radio.checked = true;
-
                     radio.onchange = () => {
                         previewAnswers[index] = opt;
                         container.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
                         label.classList.add('selected');
                         renderGrid(); 
                     };
-
                     const divText = document.createElement('div');
                     divText.className = 'option-text';
-                    
-                    // --- PEMBERSIH KONTEN OTOMATIS ---
                     let finalContent = content;
                     const regexClean = new RegExp(`^(\\s*(?:<[^>]+>\\s*)*)${opt}[\\.\\)]\\s+`, 'i');
                     finalContent = finalContent.replace(regexClean, '$1'); 
-
                     divText.innerHTML = finalContent;
-                    
                     label.appendChild(radio);
                     label.appendChild(divText);
                     container.appendChild(label);
                 }
             });
-
             document.getElementById('prevBtn').disabled = (index === 0);
             document.getElementById('nextBtn').textContent = (index === currentExamQuestions.length - 1) ? 'Selesai Preview' : 'Selanjutnya';
         }
