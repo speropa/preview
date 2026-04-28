@@ -202,6 +202,14 @@
         .option-label input { margin-top: 5px; }
         .option-text img { max-width: 100%; height: auto; vertical-align: middle; }
 
+        /* TAMBAHAN GAYA UNTUK BENAR/SALAH */
+        .bs-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95em; }
+        .bs-table th, .bs-table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
+        .bs-table th { background-color: #f8f9fa; text-align: center; }
+        .bs-table td.text-center { text-align: center; width: 60px; cursor: pointer; }
+        .bs-table input[type="radio"] { cursor: pointer; transform: scale(1.2); margin: 0; }
+        .bs-table tr:hover { background-color: #f9f9f9; }
+
         .exam-nav { display: flex; justify-content: space-between; margin-top: auto; padding-top: 15px; }
         .nav-btn {
             padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; color: white; cursor: pointer;
@@ -866,8 +874,19 @@
                 box.textContent = index + 1;
                 box.id = `nav-box-${index}`;
                 box.onclick = () => displayQuestion(index);
+                
+                // Deteksi apakah sudah dijawab (support Multi & BS)
+                let isAnswered = false;
+                const ans = previewAnswers[index];
+                if (ans !== null && ans !== undefined) {
+                    if (Array.isArray(ans)) isAnswered = ans.length > 0;
+                    else if (typeof ans === 'object') isAnswered = Object.keys(ans).length > 0;
+                    else isAnswered = (ans !== "");
+                }
+
                 if (previewRagu[index]) box.classList.add('ragu');
-                else if (previewAnswers[index] !== null) box.classList.add('answered');
+                else if (isAnswered) box.classList.add('answered');
+                
                 if (index === currentQuestionIndex) box.classList.add('current');
                 container.appendChild(box);
             });
@@ -877,41 +896,130 @@
             if (index >= currentExamQuestions.length) index = 0;
             currentQuestionIndex = index;
             const q = currentExamQuestions[index];
-            renderGrid();
+            
             document.getElementById('qNumberDisplay').textContent = index + 1;
             document.getElementById('questionContent').innerHTML = q.pertanyaan;
             raguCheckbox.checked = previewRagu[index];
+            
+            const kunjab = q.kunciJawaban || "";
+            // Deteksi Tipe Soal
+            const isBS = /^[BS](,[BS])*$/.test(kunjab.trim().toUpperCase());
+            const isPGK = !isBS && kunjab.includes(',');
+            
+            // Inisialisasi struktur penyimpanan jawaban
+            if (previewAnswers[index] === null || previewAnswers[index] === undefined) {
+                if (isPGK) previewAnswers[index] = [];
+                else if (isBS) previewAnswers[index] = {};
+                else previewAnswers[index] = "";
+            }
+
+            renderGrid();
+
             const opsis = ['A', 'B', 'C', 'D'];
             const container = document.getElementById('answerOptions');
             container.innerHTML = '';
-            opsis.forEach(opt => {
-                const content = q[`pilihan${opt}`];
-                if (content) {
-                    const label = document.createElement('label');
-                    label.className = 'option-label';
-                    if (previewAnswers[index] === opt) label.classList.add('selected');
-                    const radio = document.createElement('input');
-                    radio.type = 'radio';
-                    radio.name = 'preview_ans';
-                    radio.value = opt;
-                    if (previewAnswers[index] === opt) radio.checked = true;
-                    radio.onchange = () => {
-                        previewAnswers[index] = opt;
-                        container.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
-                        label.classList.add('selected');
-                        renderGrid(); 
-                    };
-                    const divText = document.createElement('div');
-                    divText.className = 'option-text';
-                    let finalContent = content;
-                    const regexClean = new RegExp(`^(\\s*(?:<[^>]+>\\s*)*)${opt}[\\.\\)]\\s+`, 'i');
-                    finalContent = finalContent.replace(regexClean, '$1'); 
-                    divText.innerHTML = finalContent;
-                    label.appendChild(radio);
-                    label.appendChild(divText);
-                    container.appendChild(label);
-                }
-            });
+            
+            const cleanContent = (opt, content) => {
+                const regexClean = new RegExp(`^(\\s*(?:<[^>]+>\\s*)*)${opt}[\\.\\)]\\s+`, 'i');
+                return content.replace(regexClean, '$1'); 
+            };
+
+            if (isBS) {
+                let html = '<table class="bs-table"><thead><tr><th>Pernyataan</th><th>Benar</th><th>Salah</th></tr></thead><tbody>';
+                opsis.forEach(opt => {
+                    const content = q[`pilihan${opt}`];
+                    if (content && content.trim() !== "") {
+                        const isB = previewAnswers[index][opt] === 'B';
+                        const isS = previewAnswers[index][opt] === 'S';
+                        html += `<tr>
+                            <td>${cleanContent(opt, content)}</td>
+                            <td class="text-center" onclick="document.getElementById('bs_${opt}_B').click()">
+                                <input type="radio" id="bs_${opt}_B" name="bs_${opt}" value="B" ${isB ? 'checked' : ''}>
+                            </td>
+                            <td class="text-center" onclick="document.getElementById('bs_${opt}_S').click()">
+                                <input type="radio" id="bs_${opt}_S" name="bs_${opt}" value="S" ${isS ? 'checked' : ''}>
+                            </td>
+                        </tr>`;
+                    }
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+
+                opsis.forEach(opt => {
+                    const radios = container.querySelectorAll(`input[name="bs_${opt}"]`);
+                    radios.forEach(radio => {
+                        radio.addEventListener('change', (e) => {
+                            previewAnswers[index][opt] = e.target.value;
+                            renderGrid();
+                        });
+                    });
+                });
+
+            } else if (isPGK) {
+                opsis.forEach(opt => {
+                    const content = q[`pilihan${opt}`];
+                    if (content) {
+                        const label = document.createElement('label');
+                        label.className = 'option-label';
+                        if (previewAnswers[index].includes(opt)) label.classList.add('selected');
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'preview_ans';
+                        checkbox.value = opt;
+                        if (previewAnswers[index].includes(opt)) checkbox.checked = true;
+                        
+                        checkbox.onchange = (e) => {
+                            if (e.target.checked) {
+                                if (!previewAnswers[index].includes(opt)) previewAnswers[index].push(opt);
+                                label.classList.add('selected');
+                            } else {
+                                previewAnswers[index] = previewAnswers[index].filter(item => item !== opt);
+                                label.classList.remove('selected');
+                            }
+                            renderGrid(); 
+                        };
+                        
+                        const divText = document.createElement('div');
+                        divText.className = 'option-text';
+                        divText.innerHTML = cleanContent(opt, content);
+                        label.appendChild(checkbox);
+                        label.appendChild(divText);
+                        container.appendChild(label);
+                    }
+                });
+            } else {
+                // Tampilan Biasa (Single Choice)
+                opsis.forEach(opt => {
+                    const content = q[`pilihan${opt}`];
+                    if (content) {
+                        const label = document.createElement('label');
+                        label.className = 'option-label';
+                        if (previewAnswers[index] === opt) label.classList.add('selected');
+                        
+                        const radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = 'preview_ans';
+                        radio.value = opt;
+                        if (previewAnswers[index] === opt) radio.checked = true;
+                        
+                        radio.onchange = () => {
+                            previewAnswers[index] = opt;
+                            container.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+                            label.classList.add('selected');
+                            renderGrid(); 
+                        };
+                        
+                        const divText = document.createElement('div');
+                        divText.className = 'option-text';
+                        divText.innerHTML = cleanContent(opt, content);
+                        label.appendChild(radio);
+                        label.appendChild(divText);
+                        container.appendChild(label);
+                    }
+                });
+            }
+
             document.getElementById('prevBtn').disabled = (index === 0);
             document.getElementById('nextBtn').textContent = (index === currentExamQuestions.length - 1) ? 'Selesai Preview' : 'Selanjutnya';
         }
