@@ -199,7 +199,7 @@
         .ragu-container { display: flex; align-items: center; gap: 5px; font-weight: 500; font-size: 0.9em; cursor: pointer; }
         .ragu-container input { width: 16px; height: 16px; cursor: pointer; }
 
-        #questionContent { font-size: 1.05em; line-height: 1.6; margin-bottom: 20px; }
+        #questionContent { font-size: 1.05em; line-height: 1.6; margin-bottom: 20px; overflow-x: auto; } /* Ditambah overflow agar tabel panjang bisa discroll */
         #questionContent img { max-width: 100%; height: auto; border-radius: 4px; display: block; margin: 10px 0; }
 
         .option-label {
@@ -209,16 +209,52 @@
         }
         .option-label:hover { background-color: #f9f9f9; }
         .option-label.selected { background-color: #e2f0ff; border-color: #007bff; }
-        .option-label input { margin-top: 5px; }
+        .option-label input { margin-top: 5px; flex-shrink: 0; }
+        
+        .option-text { overflow-x: auto; width: 100%; } /* Mencegah tabel di pilihan ganda memotong layar */
         .option-text img { max-width: 100%; height: auto; vertical-align: middle; }
 
-        /* TAMBAHAN GAYA UNTUK BENAR/SALAH */
-        .bs-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95em; }
-        .bs-table th, .bs-table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
-        .bs-table th { background-color: #f8f9fa; text-align: center; }
-        .bs-table td.text-center { text-align: center; width: 60px; cursor: pointer; }
-        .bs-table input[type="radio"] { cursor: pointer; transform: scale(1.2); margin: 0; }
-        .bs-table tr:hover { background-color: #f9f9f9; }
+        /* =========================================
+           4. GAYA UNTUK SEMUA TABEL (Word & Benar/Salah)
+           ========================================= */
+        #questionDisplayBox table {
+            border-collapse: collapse !important;
+            border-spacing: 0 !important; /* Menghilangkan jarak antar sel (penyebab double border) */
+            width: 100% !important;
+            max-width: 100%;
+            margin: 15px 0 !important;
+            background-color: #fff;
+            border: 1px solid #444 !important; /* Garis luar tabel tunggal tegas */
+        }
+        #questionDisplayBox table th,
+        #questionDisplayBox table td {
+            border: 1px solid #444 !important; /* Garis sel tunggal menyatu */
+            padding: 8px 10px !important;
+            vertical-align: middle;
+        }
+        
+        /* Sapu bersih gaya aneh MS Word pada teks di dalam tabel */
+        #questionDisplayBox table p,
+        #questionDisplayBox table div,
+        #questionDisplayBox table span {
+            border: none !important;
+            margin-bottom: 0 !important; /* Cegah tabel menjadi terlalu renggang */
+        }
+
+        /* Spesifik Header & Sel Tabel Benar/Salah */
+        .bs-table { font-size: 0.95em; }
+        .bs-table th {
+            background-color: #f0f4f8 !important; /* Sedikit kebiruan/abu elegan */
+            text-align: center !important;
+            font-weight: bold;
+        }
+        .bs-table td.text-center {
+            text-align: center !important;
+            width: 70px;
+            cursor: pointer;
+        }
+        .bs-table input[type="radio"] { cursor: pointer; transform: scale(1.3); margin: 0; }
+        .bs-table tr:hover { background-color: #f8fafc !important; }
 
         .exam-nav { display: flex; justify-content: space-between; margin-top: auto; padding-top: 15px; }
         .nav-btn {
