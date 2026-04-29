@@ -103,7 +103,7 @@
 
         #examBody {
             display: flex; flex-direction: column; padding: 10px; gap: 10px;
-            flex-grow: 1; overflow-y: auto; padding-bottom: 60px;
+            flex-grow: 1; overflow-y: auto; padding-bottom: 15px; /* Diubah: Mengurangi padding karena footer tidak melayang lagi */
         }
 
         /* TOMBOL UPDATE MELAYANG */
@@ -219,8 +219,9 @@
         .btn-prev:disabled { opacity: 0.5; }
 
         #previewFooter {
-            position: fixed; bottom: 0; left: 0; width: 100%;
-            background-color: #343a40; color: white; padding: 10px;
+            /* Diubah: Menghapus position fixed agar otomatis menempati ruang bawah dan tidak overlap */
+            flex-shrink: 0; width: 100%;
+            background-color: #343a40; color: white; padding: 12px 15px;
             text-align: center; font-size: 0.9em; z-index: 100;
             display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;
         }
@@ -427,6 +428,7 @@
         let currentQuestionIndex = 0;
         let timerInterval;
         
+        let examKunjabArray = []; // Array global untuk parsing kunjab "D,[A,C],[B,S,S],A"
         let previewAnswers = [];
         let previewRagu = [];
 
@@ -767,6 +769,13 @@
                 const data = snapshot.val();
                 if (!data.soal) throw new Error("Soal kosong.");
 
+                // Memecah global kunjab dan melindungi koma di dalam kurung siku
+                if (data.kunjab) {
+                    examKunjabArray = data.kunjab.match(/\[.*?\]|[^,]+/g)?.map(s => s.trim()) || [];
+                } else {
+                    examKunjabArray = [];
+                }
+
                 localTerakhirUpdate = data.terakhirUpdate || "";
 
                 if (Array.isArray(data.soal)) {
@@ -813,6 +822,13 @@
                 if (snapshot.exists()) {
                     const data = snapshot.val();
                     localTerakhirUpdate = data.terakhirUpdate;
+                    
+                    // Parsing ulang global kunjab saat data di-update
+                    if (data.kunjab) {
+                        examKunjabArray = data.kunjab.match(/\[.*?\]|[^,]+/g)?.map(s => s.trim()) || [];
+                    } else {
+                        examKunjabArray = [];
+                    }
                     
                     if (Array.isArray(data.soal)) {
                          currentExamQuestions = data.soal.filter(item => item !== null && item !== undefined);
@@ -901,10 +917,27 @@
             document.getElementById('questionContent').innerHTML = q.pertanyaan;
             raguCheckbox.checked = previewRagu[index];
             
-            const kunjab = q.kunciJawaban || "";
-            // Deteksi Tipe Soal
-            const isBS = /^[BS](,[BS])*$/.test(kunjab.trim().toUpperCase());
-            const isPGK = !isBS && kunjab.includes(',');
+            // Menarik jenis soal dari string kunjab (Memprioritaskan string Global Array)
+            let kunjabStr = "";
+            if (examKunjabArray && examKunjabArray[index]) {
+                kunjabStr = examKunjabArray[index].toUpperCase();
+            } else if (q.kunciJawaban) {
+                kunjabStr = q.kunciJawaban.toUpperCase();
+            }
+
+            let isPGK = false;
+            let isBS = false;
+            
+            // Logika Deteksi: Ada kurung siku atau koma (PGK/BS)
+            if (kunjabStr.includes('[') || kunjabStr.includes(',')) {
+                // Hilangkan bracket untuk mengecek isinya
+                const cleanStr = kunjabStr.replace(/\[|\]/g, ''); 
+                if (/^[BS](,[BS])*$/.test(cleanStr)) {
+                    isBS = true;
+                } else {
+                    isPGK = true;
+                }
+            }
             
             // Inisialisasi struktur penyimpanan jawaban
             if (previewAnswers[index] === null || previewAnswers[index] === undefined) {
